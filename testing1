@@ -1,0 +1,478 @@
+#load packages
+require(shiny)
+require(DT)
+require(esquisse)
+require(shinydashboard)
+require(shinyWidgets)
+require(shinyBS)
+require(ggthemes)
+
+library(readxl)
+customers <- read_excel("C:/Users/lilit simonyan/Desktop/marketingData/excel files/customers.xlsx")
+View(customers)
+
+library(readxl)
+cards <- read_excel("C:/Users/lilit simonyan/Desktop/marketingData/excel files/cards.xlsx")
+View(cards)
+
+library(readxl)
+cardUsage <- read_excel("C:/Users/lilit simonyan/Desktop/marketingData/excel files/CUSTJOINCARD.xlsx")
+View(cardUsage)
+
+
+customers<-as.data.frame(customers)
+customers$KIND<-NULL
+customers$INCOMEVOLUME<-NULL
+customers$POSITION<-NULL
+customers$EDUCATION<-NULL
+
+customers$CUSTOMER<-as.character(customers$CUSTOMER)
+customers$HASPHONE<-as.character(customers$HASPHONE)
+customers$HASEMAIL<-as.character(customers$HASEMAIL)
+customers$HASUSERID<-as.character(customers$HASUSERID)
+customers$CUSTKIND<-as.factor(customers$CUSTKIND)
+customers$INCOMEVOLUMEAMT<-as.factor(customers$INCOMEVOLUMEAMT)
+customers$USERID<-as.character(customers$USERID)
+customers$BRANCH<-as.factor(customers$BRANCH)
+customers$PHONE<-as.character(customers$PHONE)
+customers$BIRTHDATE<-as.Date(customers$BIRTHDATE)
+customers$ENTRYDATE<-as.Date(customers$ENTRYDATE)
+
+cards<-as.data.frame(cards)
+cards$STATUS<-NULL
+cards$HOTSTATUS<-NULL
+cards$ACTION<-NULL
+cards$CUSTOMER<-as.character(cards$CUSTOMER)
+cards$VALIDFROM<-as.Date(cards$VALIDFROM)
+cards$EXPDATE<-as.Date(cards$EXPDATE)
+
+cardUsage$CUSTOMER<-as.character(cardUsage$CUSTOMER)
+cardUsage$BIRTHDATE<-as.Date(cardUsage$BIRTHDATE)
+cardUsage$ENTRYDATE<-as.Date(cardUsage$ENTRYDATE)
+cardUsage$POSITION<-NULL
+cardUsage$USERID<-as.character(cardUsage$USERID)
+cardUsage$SRVCAMT<-as.factor(cardUsage$SRVCAMOUNT)
+cardUsage$VALIDFROM<-as.Date(cardUsage$VALIDFROM)
+cardUsage$EXPDATE<-as.Date(cardUsage$EXPDATE)
+
+require(ggplot2)
+require(plotly)
+require(sqldf)
+library(hrbrthemes)
+
+# # D A T A --------------------------------------------------------------------
+line3<-sqldf("select validfrom, typename, kind, statusname, actionname, count(*) CountSold from cards  group by validfrom, typename, kind, statusname, actionname")
+line33<-sqldf("select validfrom, typename, kind, statusname, actionname, CountSold, sum(CountSold) over(partition by validfrom) as SUMSALESDATE, avg(CountSold) over(partition by validfrom) as AVGSALESDATE from line3")
+# line4<-sqldf("select validfrom, branch, typename, kind, statusname, actionname, count(*) CountSold from cards   ")
+# line5<-sqldf("select validfrom, branch, typename, kind, statusname, actionname from cards ")
+
+
+# df1<-sqldf("
+#           select validfrom, branch, typename, kind, statusname, actionname, count() over(partition by validfrom) as SALESDATE from cards
+#       ")
+# df2<-sqldf("
+#           select validfrom, branch, typename, kind, statusname, actionname, SALESDATE, avg(SALESDATE) over(partition by validfrom) as AVGSALESDATE from df1
+#       ")
+# line<-df2
+
+
+# line6<-sqldf("select validfrom, branch, typename, kind, statusname, actionname, count(*) as SALES from cards group by validfrom, branch, typename, kind, statusname, actionname")
+# line7<-sqldf("select validfrom, branch, typename, kind, statusname, actionname, SALES, 
+#   avg(SALES) over(partition by validfrom) as AVGSALESDATE, avg(SALES) over(partition by validfrom, branch) as AVGSALESBRANCH from line6")
+# line7$AVGSALESBRANCH<-round(line7$AVGSALESBRANCH,1)
+# line7$AVGSALESDATE<-round(line7$AVGSALESDATE,1)
+line<-line33
+
+
+# MARKETING CHARTS--------------------------------------------------------------------
+
+nms <- names(line)
+
+my_css <- "
+
+.content {
+    background:white;
+}
+
+#download_data {
+
+  background-image: linear-gradient(150deg, #fe420b, #FFEB3B);
+  font-size: 16px;
+
+}
+
+.dataTables_wrapper{
+    padding-top:50px;
+}
+
+
+
+button {
+
+  background-color: linear-gradient(150deg, #fe420b, #FFEB3B);
+  font-size: 16px;
+
+}
+
+
+
+
+"
+
+
+header <- dashboardHeader(title = "IDBank Marketing Dashboard")
+
+sidebar <- dashboardSidebar(
+  sidebarMenu(
+            menuItem("Plot Builder", tabName = "plot", icon = icon("chart-bar"), badgeLabel = "charts", badgeColor = "blue"),
+            menuItem("Customer Data", tabName = "customer", icon = icon("user"), badgeLabel = "data", badgeColor = "green"),
+            menuItem("Cards", tabName = "cards", icon = icon("credit-card"), badgeLabel = "explore", badgeColor = "orange"),
+            menuItem("Loans",   tabName = "loans",   icon = icon("chart-pie")),
+            menuItem("Deposits", tabName = "deposits", icon = icon("chart-bar")),
+            menuItem("Digital Banking", tabName = "digitalBanking", icon = icon("funnel-dollar")),
+            menuItem("Branches", tabName = "branches", icon = icon("building")),
+            menuItem("Marketing KPIs", tabName = "marketing", icon = icon("ad"))
+  )
+)
+
+body <- dashboardBody(
+   # theme = shinythemes::shinytheme("united"), 
+  tags$style(my_css),
+  fluidPage(
+        tabItems(
+          
+              # tags$head(
+              #   tags$style(HTML('.dt-button .buttons-copy .buttons-html5{background:orange}'))
+              # ),
+            # First tab content
+            tabItem(tabName = "plot", class = "active"
+              # , ("Plot Builder")
+              ,   esquisserUI(
+              id = "esquisse", 
+              header = TRUE, # dont display gadget title
+              choose_data = TRUE, # dont display button to change data,
+              container = esquisseContainer(height = "900px")
+            )
+            ),
+          # Initial tab content
+            tabItem(tabName = "customer", 
+                      fluidRow(
+                         column(2,
+                             h2("Filter Data"),
+                             downloadButton("download_data", "Download All"),
+                             br(),br(),
+                          radioButtons(
+                              inputId = "dataset", 
+                              label = "Select Data:",
+                              choices = c(
+                                "customers", "cards", "cardUsage"
+                              ),
+                              inline = TRUE
+                          )
+                                  # ,checkboxGroupInput("show_vars", "Columns in Cards data to show:",
+                                  #    names(mm), selected = names(mm)) 
+                                  ,filterDF_UI("filtering")
+                                  # , downloadButton("downloadData", "Download")
+
+                              ), 
+                            column(10,
+                               progressBar(
+                                    id = "pbar", value = 50, 
+                                    total = 100, display_pct = TRUE
+                                  ),
+                                tabPanel(
+                                          title = "customerdata",
+                                          DT::dataTableOutput("customerdata")
+                                        )
+                                  )
+                       )
+            ),
+          # Second tab content
+            tabItem(tabName = "cards",
+              # fluidPage(
+
+               headerPanel("Cards Explorer"),
+                  sidebarPanel(
+                      textInput("title", "Please input chart title", "Plot Title"),
+
+                         dateRangeInput('dateRange',
+                          label = 'Please select Date range',
+                          start = Sys.Date() - 30, 
+                          end = Sys.Date(),
+                          min = min(line$VALIDFROM),
+                          max = max(line$VALIDFROM)
+                        ),
+
+                      selectInput(inputId="typename", 
+                                             label= "Card Type", 
+                                             choices=c("All", unique(as.character(line$TYPENAME))),  
+                                             multiple = TRUE,
+                                             selected = "All"
+                                             ),
+                      selectInput(inputId="kindname", 
+                                             label= "Card Kind", 
+                                             choices=c("All", unique(as.character(line$KIND))),  
+                                             multiple = TRUE,
+                                             selected = "All"
+                                             ),
+
+                       selectInput(inputId="branch", 
+                                             label= "Branch", 
+                                             choices=c("All", unique(as.character(line$BRANCH))),  
+                                             multiple = TRUE,
+                                             selected = "All"
+                                             ),
+                      selectInput(inputId="statusname", 
+                                             label= "Card Status", 
+                                             choices=c("All", unique(as.character(line$STATUSNAME))),  
+                                             multiple = TRUE,
+                                             selected = "All"
+                                             ),
+
+                      column(6,
+                          selectInput('x', 'X', choices = nms, selected = 'VALIDFROM')
+                      ),
+                      column(6,
+                          selectInput('y', 'Y', choices = nms, selected ='CountSold')
+                      ),
+                      column(6,
+                          selectInput('color', 'Color', choices = nms, selected = 'TYPENAME')
+                      ),
+                      column(6,
+                          selectInput('fill', 'Fill', choices = nms, selected = 'TYPENAME')
+                      ),
+                      column(6,
+                          selectInput('facet_row', 'Facet Row', c(None = '.', nms)
+                                                            # , selected = 'TYPENAME'
+                                                            )
+                      ),
+                      column(6,
+                          selectInput('facet_col', 'Facet Column', c(None = '.', nms))
+                      ),
+                      sliderInput('plotHeight', 'Height of plot (in pixels)', 
+                                  min = 100, max = 1000, value = 700)
+                      ),
+                        mainPanel(
+                          plotlyOutput('trendPlot', height = "400px"),
+                          br(),br(),br(),br()
+                        ),
+
+                       br(),br(),br(),br(),
+                       fluidRow(width =12,
+                                title = "cardChartsData",
+                                DT::dataTableOutput("cardCharts")
+                       )
+
+            # )
+
+
+
+            ),
+            # Second tab content
+            tabItem(tabName = "loans",
+              h2("Loan consumption")
+
+            ),
+              # Third tab content
+            tabItem(tabName = "deposits",
+              h2("Plastic cards consumption")
+            ),
+               # Forth tab content
+            tabItem(tabName = "digitalBanking",
+              h2("DigitalBanking usage")
+            ),
+          
+           # Fifth tab content
+            tabItem(tabName = "branches",
+              h2("Consumption per branch")
+            ),
+            # Fifth tab content
+            tabItem(tabName = "marketing",
+              h2("Marketing KPI-s")
+            )
+            
+        )
+  )
+)
+
+
+
+ui<-dashboardPage(header, sidebar, body)
+# sketch = htmltools::withTags(table(
+#   tableHeader(cust),
+#   tableFooter(cust)
+# ))
+# container = sketch, 
+
+server <- function(input, output, session) {
+ data <- reactive({
+    get(input$dataset)
+  })
+
+
+  output$download_data <- downloadHandler(
+    filename = "data.csv",
+    content = function(file) {
+      # data <- data()
+     data<-res_filter$data_filtered()
+      write.csv(data, file, row.names = FALSE)
+    }
+  )
+
+res_filter <- callModule(
+    module = filterDF, 
+    id = "filtering", 
+    data_table = data,
+    data_name = reactive(input$dataset)
+  )
+
+ observeEvent(res_filter$data_filtered(), {
+    updateProgressBar(
+      session = session, id = "pbar", 
+      value = nrow(res_filter$data_filtered()), total = nrow(data())
+    )
+  })
+  
+
+  # DT::datatable(as.data.frame(mm[1:1000,input$show_vars, drop=FALSE] )
+
+    output$customerdata <-  DT::renderDT({
+      res_filter$data_filtered()  
+      }, 
+  # DT::datatable(as.data.frame(mm[1:1000,input$show_vars, drop=FALSE] ), 
+      filter = 'top', extensions = c('Buttons', 
+                                      # 'Responsive', 
+                                      'ColReorder'),
+                           options = list(
+                                         searching = TRUE
+                                        ,autoWidth = FALSE 
+                                        ,scrollX = TRUE
+                                        # ,order = list(4, 'desc')
+                                        , colReorder = TRUE
+                                        , pageLength = 100
+                                        , dom = 'Blfrtip'
+                                        , buttons = c('colvis','copy', 'csv', 'excel',  'pdf', 'print')
+                                        # , orientation ='landscape'
+                                        # , rowReorder = TRUE, order = list(c(0 , 'asc'))
+                                        , initComplete = JS(
+                                                      "function(settings, json) {",
+                                                      "$(this.api().table().header()).css({'background-color': '#337ab7', 'color': '#fff'});",
+                                                      "}")
+
+                                        # ,fixedColumns = list(leftColumns = 2, rightColumns = 2)
+
+               ))
+
+
+# run_module("coerce")   
+callModule(module = esquisserServer, dataModule =  "GlobalEnv", id = "esquisse")
+
+# esquisserServer(input, output, session, data = data(),
+#   dataModule =  "ImportFile", sizeDataModule = "m")
+
+
+
+# C H A R T S
+ # add reactive data information
+  dataset <- reactive({
+    data <- as.data.frame(line)
+    data <- subset(data, data$VALIDFROM>=input$dateRange[1] & data$VALIDFROM<=input$dateRange[2])
+    
+     if (input$typename != "All") {
+        data <- subset(
+          data,
+          TYPENAME %in% input$typename
+        )
+      }
+
+     if (input$kindname != "All") {
+          data <- subset(
+            data,
+            KIND %in% input$kindname
+          )
+      }
+
+     if (input$branch != "All") {
+        data <- subset(
+          data,
+          BRANCH %in% input$branch
+        )
+      }
+
+     if (input$statusname != "All") {
+          data <- subset(
+            data,
+            STATUSNAME %in% input$statusname
+          )
+      }
+
+    data
+ 
+  })
+
+
+  # P-L-O-T-L-Y-------------------------------------------------------------------
+
+  output$trendPlot <- renderPlotly({
+
+    # build graph with ggplot syntax
+    p <- ggplot(dataset(), 
+                aes_string(x = input$x, 
+                           y = input$y, 
+                           color = input$color,
+                           fill= input$fill
+                           # ,alpha = 0.5
+                           )
+                  ) + 
+      # geom_line() +
+      # geom_area(alpha=0.6) +
+      geom_col() + 
+      # geom_point() +
+      # scale_color_viridis_d(direction = -1, option = "D") +
+      # scale_fill_viridis_d(direction = -1, option = "D")+
+       # scale_fill_manual(values=c("#999999", "#E69F00"))+
+      theme_ipsum() +
+      ggtitle(input$title)+
+
+      # theme_hc()+ scale_colour_hc()+scale_fill_hc()+
+      theme_calc()+ scale_colour_calc()+ scale_fill_calc()+
+         # geom_text(aes(label=CountSold), vjust=1.6, color="black", size=3.5)+ 
+         theme(plot.title = element_text(size = 30, face = "bold"))
+
+    # if at least one facet column/row is specified, add it
+    facets <- paste(input$facet_row, '~', input$facet_col)
+    if (facets != '. ~ .') p <- p + facet_grid(facets)
+
+    ggplotly(p) %>% 
+      layout(height = input$plotHeight, autosize=TRUE)
+
+  })
+
+  # D A T A T A B L E -------------------------------------------------------------------
+
+   output$cardCharts <- DT::renderDataTable({
+    DT::datatable(dataset(), 
+          filter = 'top'
+          , extensions = c('Buttons', 
+                          'Responsive', 
+                          'ColReorder'),
+                           options = list(
+                                         searching = TRUE
+                                        ,autoWidth = FALSE 
+                                         ,initComplete = JS(
+                                            "function(settings, json) {",
+                                            "$(this.api().table().header()).css({'background-color': '#428bca', 'color': '#000'});",
+                                            "}")
+                                        # ,scrollX = TRUE
+                                        # ,order = list(4, 'desc')
+                                        , colReorder = TRUE
+                                        , pageLength = 10
+                                        , dom = 'Blfrtip'
+                                        , buttons = c('colvis','copy', 'csv', 'excel',  'pdf', 'print'))
+        )
+
+    })
+
+}
+
+runApp(list(ui = ui, server = server), launch.browser = TRUE)
